@@ -1,10 +1,27 @@
 # Changelog
 
-## 1.6.1 -- Unreleased
+## 1.6.1 -- 2019-10-29
+
+### Deprecation Warnings
+* Deprecated `AwsCrypto.encryptString()` and `AwsCrypto.decryptString()`.
+  Replace your calls to these methods with calls to AwsCrypto.encryptData() and AwsCrypto.decryptData().
+  Unlike the deprecated methods, these methods don't perform any Base64 encoding or decoding, so they are fully compatible with other language implementations of the AWS Encryption SDK.
+  
+  If you need Base64 encoding or decoding for your application, you can add it outside of the AWS Encryption SDK.
+  [PR #120](https://github.com/aws/aws-encryption-sdk-java/pull/120)
+
+### Patches
+* Correctly validate version [PR #116](https://github.com/aws/aws-encryption-sdk-java/pull/116)
+* `ParsedCiphertext` now handles truncated input properly [PR #119](https://github.com/aws/aws-encryption-sdk-java/pull/119)
+
 ### Maintenance
-* Add support for standard test vectors via `testVectorZip` system property.
-* No longer require use of BouncyCastle with RSA `JceMasterKey`s
-* No longer use BouncyCastle for Elliptic Curve key generation and point compression/decompression
+* Add support for standard test vectors via `testVectorZip` system property. [PR #127](https://github.com/aws/aws-encryption-sdk-java/pull/127)
+* Remove all explicit cryptographic dependencies on BouncyCastle. The AWS Encryption SDK for Java still uses Bouncy Castle for other tasks. PRs
+  [#128](https://github.com/aws/aws-encryption-sdk-java/pull/128),
+  [#129](https://github.com/aws/aws-encryption-sdk-java/pull/129),
+  [#130](https://github.com/aws/aws-encryption-sdk-java/pull/130),
+  [#131](https://github.com/aws/aws-encryption-sdk-java/pull/131),
+  and [#132](https://github.com/aws/aws-encryption-sdk-java/pull/132).
 
 ## 1.6.0 -- 2019-05-31
 
@@ -17,7 +34,7 @@
 ## 1.5.0 -- 2019-05-30
 
 ### Minor Changes
-* Add dependency on Apache Commons Codec 1.12.
+* Added dependency on Apache Commons Codec 1.12.
 * Use org.apache.commons.codec.binary.Base64 instead of java.util.Base64 so
   that the SDK can be used on systems that do not have java.util.Base64 but
   support Java 8 language features.
