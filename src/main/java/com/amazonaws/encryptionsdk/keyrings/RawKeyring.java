@@ -25,8 +25,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -36,31 +34,47 @@ import static org.apache.commons.lang3.Validate.notNull;
 /**
  * A keyring supporting local encryption and decryption using either RSA or AES-GCM.
  */
-public class RawKeyring implements Keyring {
+abstract class RawKeyring implements Keyring {
 
-    private final String keyNamespace;
-    private final String keyName;
+    final String keyNamespace;
+    final String keyName;
+    final byte[] keyNameBytes;
     private final JceKeyCipher jceKeyCipher;
     private static final Charset KEY_NAME_ENCODING = StandardCharsets.UTF_8;
     private static final Logger LOGGER = Logger.getLogger(RawKeyring.class.getName());
 
-    static Keyring aes(String keyNamespace, String keyName, SecretKey wrappingKey) {
-        return new RawKeyring(keyNamespace, keyName, JceKeyCipher.aesGcm(wrappingKey));
-    }
-
-    static Keyring rsa(String keyNamespace, String keyName, PublicKey publicKey, PrivateKey privateKey, String transformation) {
-        return new RawKeyring(keyNamespace, keyName, JceKeyCipher.rsa(publicKey, privateKey, transformation));
-    }
-
-    private RawKeyring(final String keyNamespace, final String keyName, JceKeyCipher jceKeyCipher) {
+    RawKeyring(final String keyNamespace, final String keyName, JceKeyCipher jceKeyCipher) {
         notBlank(keyNamespace, "keyNamespace is required");
         notBlank(keyName, "keyName is required");
         notNull(jceKeyCipher, "jceKeyCipher is required");
 
         this.keyNamespace = keyNamespace;
         this.keyName = keyName;
+        this.keyNameBytes = keyName.getBytes(KEY_NAME_ENCODING);
         this.jceKeyCipher = jceKeyCipher;
     }
+
+    /**
+     * Returns true if the given encrypted data key may be decrypted with this keyring.
+     *
+     * @param encryptedDataKey The encrypted data key.
+     * @return True if the key may be decrypted, false otherwise.
+     */
+    abstract boolean validToDecrypt(EncryptedDataKey encryptedDataKey);
+
+    /**
+     * Records trace entries for the given keyring upon successful encryption.
+     *
+     * @param keyringTrace The keyring trace to record to.
+     */
+    abstract void traceOnEncrypt(KeyringTrace keyringTrace);
+
+    /**
+     * Records trace entries for the given keyring upon successful decryption.
+     *
+     * @param keyringTrace The keyring trace to record to.
+     */
+    abstract void traceOnDecrypt(KeyringTrace keyringTrace);
 
     @Override
     public void onEncrypt(EncryptionMaterials encryptionMaterials) {
@@ -81,7 +95,7 @@ public class RawKeyring implements Keyring {
                 cleartextDataKey.getEncoded(), keyName, keyNamespace, encryptionMaterials.getEncryptionContext());
         encryptionMaterials.getEncryptedDataKeys().add(new KeyBlob(encryptedDataKey));
 
-        encryptionMaterials.getKeyringTrace().add(keyNamespace, keyName, KeyringTraceFlag.ENCRYPTED_DATA_KEY);
+        traceOnEncrypt(encryptionMaterials.getKeyringTrace());
     }
 
     @Override
@@ -93,26 +107,18 @@ public class RawKeyring implements Keyring {
             return;
         }
 
-        final byte[] keyNameBytes = keyName.getBytes(KEY_NAME_ENCODING);
-
         for (EncryptedDataKey encryptedDataKey : encryptedDataKeys) {
-            if (!keyNamespace.equals(encryptedDataKey.getProviderId())) {
-                continue;
-            }
-
-            if (!Utils.arrayPrefixEquals(encryptedDataKey.getProviderInformation(), keyNameBytes, keyNameBytes.length)) {
-                continue;
-            }
-
-            try {
-                final byte[] decryptedKey = jceKeyCipher.decryptKey(
-                        encryptedDataKey, keyName, decryptionMaterials.getEncryptionContext());
-                decryptionMaterials.setCleartextDataKey(
-                        new SecretKeySpec(decryptedKey, decryptionMaterials.getAlgorithm().getDataKeyAlgo()));
-                decryptionMaterials.getKeyringTrace().add(keyNamespace, keyName, KeyringTraceFlag.DECRYPTED_DATA_KEY);
-                return;
-            } catch (Exception e) {
-                LOGGER.info("Could not decrypt key due to: " + e.getMessage());
+            if (validToDecrypt(encryptedDataKey)) {
+                try {
+                    final byte[] decryptedKey = jceKeyCipher.decryptKey(
+                            encryptedDataKey, keyName, decryptionMaterials.getEncryptionContext());
+                    decryptionMaterials.setCleartextDataKey(
+                            new SecretKeySpec(decryptedKey, decryptionMaterials.getAlgorithm().getDataKeyAlgo()));
+                    traceOnDecrypt(decryptionMaterials.getKeyringTrace());
+                    return;
+                } catch (Exception e) {
+                    LOGGER.info("Could not decrypt key due to: " + e.getMessage());
+                }
             }
         }
 

@@ -43,7 +43,7 @@ public interface Keyring {
     void onDecrypt(DecryptionMaterials decryptionMaterials, List<EncryptedDataKey> encryptedDataKeys);
 
     /**
-     * Constructs a {@link Keyring} which does local AES-GCM encryption
+     * Constructs a {@code Keyring} which does local AES-GCM encryption
      * decryption of data keys using the provided wrapping key.
      *
      * @param keyNamespace A UTF-8 encoded value that, together with the key name, identifies the wrapping key.
@@ -52,12 +52,12 @@ public interface Keyring {
      * @return The {@link Keyring}
      */
     static Keyring rawAes(String keyNamespace, String keyName, SecretKey wrappingKey) {
-        return RawKeyring.aes(keyNamespace, keyName, wrappingKey);
+        return new RawAesKeyring(keyNamespace, keyName, wrappingKey);
     }
 
     /**
-     * Constructs a {@link Keyring} which does local RSA encryption and decryption of data keys using the
-     * provided public and private keys. If {@code privateKey} is {@code null} then the returned {@link Keyring}
+     * Constructs a {@code Keyring} which does local RSA encryption and decryption of data keys using the
+     * provided public and private keys. If {@code privateKey} is {@code null} then the returned {@code Keyring}
      * can only be used for encryption.
      *
      * @param keyNamespace      A UTF-8 encoded value that, together with the key name, identifies the wrapping key.
@@ -68,6 +68,6 @@ public interface Keyring {
      * @return The {@link Keyring}
      */
     static Keyring rawRsa(String keyNamespace, String keyName, PublicKey publicKey, PrivateKey privateKey, String wrappingAlgorithm) {
-        return RawKeyring.rsa(keyNamespace, keyName, publicKey, privateKey, wrappingAlgorithm);
+        return new RawRsaKeyring(keyNamespace, keyName, publicKey, privateKey, wrappingAlgorithm);
     }
 }
